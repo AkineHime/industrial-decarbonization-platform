@@ -333,6 +333,27 @@ app.post('/api/scenarios', async (req, res) => {
     }
 });
 
+// Update Scenario
+app.put('/api/scenarios/:id', async (req, res) => {
+    const { id } = req.params;
+    const { name, description, target_year, interventions, mine_id } = req.body;
+    try {
+        if (!process.env.DATABASE_URL) return res.json({ success: true });
+        const query = `
+            UPDATE scenarios 
+            SET name = $1, description = $2, target_year = $3, interventions = $4, mine_id = $5
+            WHERE id = $6
+            RETURNING *
+        `;
+        const values = [name, description, target_year, JSON.stringify(interventions), mine_id, id];
+        const result = await pool.query(query, values);
+        res.json(result.rows[0]);
+    } catch (err: any) {
+        console.error(err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // Delete Scenario
 app.delete('/api/scenarios/:id', async (req, res) => {
     const { id } = req.params;

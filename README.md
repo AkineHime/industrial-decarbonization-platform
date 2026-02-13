@@ -7,7 +7,7 @@ A comprehensive platform for monitoring, calculating, and strategizing industria
 *   **Real-time Dashboard**: KPI monitoring and Net-Zero path forecasting with dynamic strategy toggles.
 *   **Unit Management**: Register and manage industrial nodes (mines/factories) across multiple locations.
 *   **Emissions Calculator**: Comprehensive Scope 1 & 2 calculations based on real operational inputs (Diesel, Electricity, Explosives).
-*   **Scenario Planning**: Compare "Aggressive" vs "Standard" decarbonization pathways to visualize future impacts.
+*   **Scenario Planning**: Model decarbonization pathways with persistent interventions. Save and update custom strategies including CAPEX intensity and Net-Zero target forecasting.
 *   **Bulk Data Management**: High-performance Excel/CSV ingestion for large-scale operational data.
 *   **Professional Reporting**:
     *   **Strategic PDF Generator**: Detailed Net-Zero Transition Plans including methodology and emission factors.

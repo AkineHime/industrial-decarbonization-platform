@@ -124,12 +124,17 @@ export function ScenarioPlanning() {
     };
 
     const handleCreateScenario = async (data: any) => {
+        // Map selected IDs to full objects for persistence
+        const selectedObjects = activeInterventions.map(id =>
+            localInterventions.find(i => i.id === id)
+        ).filter(Boolean);
+
         const payload = {
             mine_id: data.mine_id || null,
             name: data.name,
             description: data.description,
             target_year: parseInt(data.target_year),
-            interventions: activeInterventions
+            interventions: selectedObjects // Save full objects
         };
 
         try {
@@ -154,6 +159,36 @@ export function ScenarioPlanning() {
         }
     };
 
+    const handleUpdateScenario = async () => {
+        if (!selectedScenario) return;
+
+        const selectedObjects = activeInterventions.map(id =>
+            localInterventions.find(i => i.id === id)
+        ).filter(Boolean);
+
+        const payload = {
+            ...selectedScenario,
+            interventions: selectedObjects
+        };
+
+        try {
+            const res = await fetch(`http://localhost:3000/api/scenarios/${selectedScenario.id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            if (res.ok) {
+                const updated = await res.json();
+                setScenarios(scenarios.map(s => s.id === updated.id ? updated : s));
+                setSelectedScenario(updated);
+                alert('Scenario updated with selected interventions!');
+            }
+        } catch (err) {
+            console.error(err);
+            alert('Update failed.');
+        }
+    };
+
     const chartData = generateChartData();
 
     const formatValue = (value: number | undefined | any) => {
@@ -170,13 +205,24 @@ export function ScenarioPlanning() {
                     <h1 className="text-3xl font-bold text-slate-100">Scenario Simulator</h1>
                     <p className="text-slate-500">Model decarbonization pathways and interventions</p>
                 </div>
-                <button
-                    onClick={() => { setIsCreating(true); setSelectedScenario(null); setActiveInterventions([]); reset(); }}
-                    className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold px-4 py-2 rounded-lg flex items-center transition-colors"
-                >
-                    <Plus className="w-5 h-5 mr-2" />
-                    New Scenario
-                </button>
+                <div className="flex gap-3">
+                    {selectedScenario && (
+                        <button
+                            onClick={handleUpdateScenario}
+                            className="bg-indigo-500/20 text-indigo-400 border border-indigo-500/50 hover:bg-indigo-500 hover:text-white font-bold px-4 py-2 rounded-lg flex items-center transition-all"
+                        >
+                            <Activity className="w-5 h-5 mr-2" />
+                            Update Scenario
+                        </button>
+                    )}
+                    <button
+                        onClick={() => { setIsCreating(true); setSelectedScenario(null); setActiveInterventions([]); reset(); }}
+                        className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold px-4 py-2 rounded-lg flex items-center transition-colors"
+                    >
+                        <Plus className="w-5 h-5 mr-2" />
+                        New Scenario
+                    </button>
+                </div>
             </div>
 
             <div className="grid grid-cols-12 gap-6 flex-1 min-h-0">
@@ -194,11 +240,26 @@ export function ScenarioPlanning() {
                                         onClick={() => {
                                             setSelectedScenario(s);
                                             setIsCreating(false);
-                                            // Parse interventions safely
-                                            const ivs = Array.isArray(s.interventions)
+
+                                            // 1. Process interventions from DB (could be IDs or full objects)
+                                            let ivs = Array.isArray(s.interventions)
                                                 ? s.interventions
                                                 : (typeof s.interventions === 'string' ? JSON.parse(s.interventions) : []);
-                                            setActiveInterventions(ivs || []);
+
+                                            if (!ivs) ivs = [];
+
+                                            // 2. Identify and restore any custom interventions stored in the scenario
+                                            const scenarioInterventions = ivs.filter((i: any) => typeof i === 'object');
+                                            const scenarioIds = ivs.map((i: any) => typeof i === 'object' ? i.id : i);
+
+                                            // 3. Merged those back into our local list so UI can show them
+                                            setLocalInterventions(prev => {
+                                                const existingIds = prev.map(p => p.id);
+                                                const newItems = scenarioInterventions.filter((i: any) => !existingIds.includes(i.id));
+                                                return [...prev, ...newItems];
+                                            });
+
+                                            setActiveInterventions(scenarioIds || []);
                                         }}
                                         className={cn(
                                             "p-4 rounded-xl border cursor-pointer transition-all hover:bg-slate-800 relative group",
