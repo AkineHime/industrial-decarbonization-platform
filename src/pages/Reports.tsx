@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { FileText, Download, CheckCircle, Loader2 } from 'lucide-react';
+import { FileText, Download, Loader2 } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 import * as XLSX from 'xlsx';
 
@@ -215,12 +215,6 @@ export function Reports() {
                 setLoadingCard(null);
             }
 
-        } else if (type === 'draft') {
-            setLoadingCard('draft');
-            setTimeout(() => {
-                alert("BRSR Draft feature is currently undergoing manual review updates.");
-                setLoadingCard(null);
-            }, 1000);
         }
     };
 
@@ -272,27 +266,6 @@ export function Reports() {
                     >
                         {loadingCard === 'csv' ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Download className="w-4 h-4 mr-2" />}
                         {loadingCard === 'csv' ? 'Exporting...' : 'Download Excel'}
-                    </button>
-                </div>
-
-                {/* Regulatory Filing (Draft) */}
-                <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 hover:border-amber-500/50 transition-colors group">
-                    <div className="flex items-start justify-between mb-4">
-                        <div className="p-3 bg-amber-500/10 rounded-xl text-amber-500 group-hover:bg-amber-500 group-hover:text-slate-950 transition-all">
-                            <CheckCircle className="w-6 h-6" />
-                        </div>
-                        <span className="bg-amber-500/10 text-amber-500 text-xs font-bold px-2 py-1 rounded">Compliance</span>
-                    </div>
-                    <h3 className="text-xl font-bold text-slate-100 mb-2">SEBI BRSR Disclosure</h3>
-                    <p className="text-sm text-slate-400 mb-6">Business Responsibility and Sustainability Report format for FY{new Date().getFullYear()}-{new Date().getFullYear() + 1} regulatory filing.</p>
-
-                    <button
-                        onClick={() => handleDownload('draft')}
-                        disabled={loadingCard === 'draft'}
-                        className="w-full py-3 bg-slate-800 hover:bg-amber-600 hover:text-white text-slate-300 rounded-lg font-bold transition-all flex items-center justify-center border border-slate-700 hover:border-transparent disabled:opacity-50 disabled:cursor-wait"
-                    >
-                        <Download className="w-4 h-4 mr-2" />
-                        Export Draft
                     </button>
                 </div>
             </div>

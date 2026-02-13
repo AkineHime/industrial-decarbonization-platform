@@ -238,6 +238,7 @@ app.get('/api/analytics/detailed', async (req, res) => {
             return res.json({
                 byActivity: [],
                 byScope: [],
+                byMine: [],
                 monthlyTrend: []
             });
         }
@@ -248,15 +249,13 @@ app.get('/api/analytics/detailed', async (req, res) => {
             FROM emission_entries 
             GROUP BY activity_type
         `);
-
-        // Add colors for UI
         const colors: any = {
             diesel: '#f59e0b',
             grid_electricity: '#3b82f6',
             explosives: '#ef4444'
         };
         const byActivity = activityResult.rows.map(r => ({
-            ...r,
+            name: r.name.charAt(0).toUpperCase() + r.name.slice(1).replace('_', ' '),
             value: parseFloat(r.value),
             color: colors[r.name] || '#6366f1'
         }));
@@ -273,12 +272,25 @@ app.get('/api/analytics/detailed', async (req, res) => {
             scope3: '#a855f7'
         };
         const byScope = scopeResult.rows.map(r => ({
-            ...r,
+            name: r.name.charAt(0).toUpperCase() + r.name.slice(1),
             value: parseFloat(r.value),
             color: scopeColors[r.name] || '#94a3b8'
         }));
 
-        // 3. Monthly Trend
+        // 3. By Mine
+        const mineResult = await pool.query(`
+            SELECT m.name, SUM(e.co2e_tons) as value 
+            FROM emission_entries e
+            JOIN mines m ON e.mine_id = m.id
+            GROUP BY m.name
+            ORDER BY value DESC
+        `);
+        const byMine = mineResult.rows.map(r => ({
+            name: r.name,
+            value: parseFloat(r.value)
+        }));
+
+        // 4. Monthly Trend
         const trendResult = await pool.query(`
             SELECT 
                 TO_CHAR(date, 'Mon') as name, 
@@ -293,7 +305,7 @@ app.get('/api/analytics/detailed', async (req, res) => {
             emissions: parseFloat(r.emissions)
         }));
 
-        res.json({ byActivity, byScope, monthlyTrend });
+        res.json({ byActivity, byScope, byMine, monthlyTrend });
     } catch (err: any) {
         console.error(err);
         res.status(500).json({ error: err.message });

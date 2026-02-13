@@ -238,21 +238,26 @@ export function ScenarioPlanning() {
                                     <div
                                         key={s.id}
                                         onClick={() => {
+                                            if (selectedScenario?.id === s.id) {
+                                                setSelectedScenario(null);
+                                                setActiveInterventions([]);
+                                                return;
+                                            }
                                             setSelectedScenario(s);
                                             setIsCreating(false);
 
-                                            // 1. Process interventions from DB (could be IDs or full objects)
+                                            // 1. Process interventions from DB
                                             let ivs = Array.isArray(s.interventions)
                                                 ? s.interventions
                                                 : (typeof s.interventions === 'string' ? JSON.parse(s.interventions) : []);
 
                                             if (!ivs) ivs = [];
 
-                                            // 2. Identify and restore any custom interventions stored in the scenario
+                                            // 2. Identify and restore custom interventions
                                             const scenarioInterventions = ivs.filter((i: any) => typeof i === 'object');
                                             const scenarioIds = ivs.map((i: any) => typeof i === 'object' ? i.id : i);
 
-                                            // 3. Merged those back into our local list so UI can show them
+                                            // 3. Merge back into local list
                                             setLocalInterventions(prev => {
                                                 const existingIds = prev.map(p => p.id);
                                                 const newItems = scenarioInterventions.filter((i: any) => !existingIds.includes(i.id));
