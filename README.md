@@ -12,7 +12,9 @@ A comprehensive platform for monitoring, calculating, and strategizing industria
 *   **Professional Reporting**:
     *   **Strategic PDF Generator**: Detailed Net-Zero Transition Plans including methodology and emission factors.
     *   **Advanced Excel Export**: Regulatory-ready multi-sheet workbooks with Scope 1, 2, and 3 breakdowns.
-*   **Environmental Intelligence (Deep Analytics)**: Premium dashboard for carbon intensity analysis, automated hotspot identification, and unit performance benchmarking across multiple industrial sites.
+*   **Environmental Intelligence (Deep Analytics)**: Premium dashboard with a mathematical dynamic HSL color system, automated hotspot identification, and unit performance benchmarking across multiple industrial sites.
+*   **Platform Settings**: Centralized configuration for organizational defaults, sustainability strategic targets (Net-Zero year), and emission factor overrides.
+*   **Mathematical Visualizations**: Interactive donut breakdown, horizontal protocol analysis, and Net-Zero temporal trend analysis with smooth CSS micro-animations.
 
 ---
 
