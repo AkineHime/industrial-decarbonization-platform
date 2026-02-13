@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { Plus, Activity } from 'lucide-react';
+import { Plus, Activity, Factory } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useForm } from 'react-hook-form';
 
@@ -17,8 +17,16 @@ export function ScenarioPlanning() {
     const [selectedScenario, setSelectedScenario] = useState<any | null>(null);
     const [activeInterventions, setActiveInterventions] = useState<string[]>([]);
     const [baseEmissions, setBaseEmissions] = useState(0);
+    const [mines, setMines] = useState<any[]>([]);
 
-    const { register, handleSubmit } = useForm();
+    const { register, handleSubmit, reset } = useForm({
+        defaultValues: {
+            name: '',
+            description: '',
+            target_year: '2030',
+            mine_id: ''
+        }
+    });
     const [isCreating, setIsCreating] = useState(false);
 
     // Custom Interventions State
@@ -35,6 +43,12 @@ export function ScenarioPlanning() {
         fetch('http://localhost:3000/api/scenarios')
             .then(res => res.json())
             .then(data => setScenarios(data))
+            .catch(err => console.error(err));
+
+        // Fetch mines
+        fetch('http://localhost:3000/api/mines')
+            .then(res => res.json())
+            .then(data => setMines(data))
             .catch(err => console.error(err));
 
         // Fetch base emissions (current total)
@@ -111,7 +125,7 @@ export function ScenarioPlanning() {
 
     const handleCreateScenario = async (data: any) => {
         const payload = {
-            mine_id: null, // Global for now
+            mine_id: data.mine_id || null,
             name: data.name,
             description: data.description,
             target_year: parseInt(data.target_year),
@@ -129,9 +143,14 @@ export function ScenarioPlanning() {
                 setScenarios([newScenario, ...scenarios]);
                 setIsCreating(false);
                 setSelectedScenario(newScenario);
+                alert('Scenario saved successfully!');
+            } else {
+                const err = await res.json();
+                alert('Failed to save scenario: ' + err.error);
             }
         } catch (err) {
             console.error(err);
+            alert('Connection error. Please try again.');
         }
     };
 
@@ -152,7 +171,7 @@ export function ScenarioPlanning() {
                     <p className="text-slate-500">Model decarbonization pathways and interventions</p>
                 </div>
                 <button
-                    onClick={() => { setIsCreating(true); setSelectedScenario(null); setActiveInterventions([]); }}
+                    onClick={() => { setIsCreating(true); setSelectedScenario(null); setActiveInterventions([]); reset(); }}
                     className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold px-4 py-2 rounded-lg flex items-center transition-colors"
                 >
                     <Plus className="w-5 h-5 mr-2" />
@@ -175,11 +194,11 @@ export function ScenarioPlanning() {
                                         onClick={() => {
                                             setSelectedScenario(s);
                                             setIsCreating(false);
-                                            // Parse interventions if string/json
-                                            try {
-                                                const ivs = typeof s.interventions === 'string' ? JSON.parse(s.interventions) : s.interventions;
-                                                setActiveInterventions(ivs || []);
-                                            } catch (e) { setActiveInterventions([]); }
+                                            // Parse interventions safely
+                                            const ivs = Array.isArray(s.interventions)
+                                                ? s.interventions
+                                                : (typeof s.interventions === 'string' ? JSON.parse(s.interventions) : []);
+                                            setActiveInterventions(ivs || []);
                                         }}
                                         className={cn(
                                             "p-4 rounded-xl border cursor-pointer transition-all hover:bg-slate-800 relative group",
@@ -197,7 +216,15 @@ export function ScenarioPlanning() {
                                                 &times;
                                             </button>
                                         </div>
-                                        <span className="text-xs bg-slate-800 px-2 py-0.5 rounded text-slate-400 block w-fit mb-1">{s.target_year}</span>
+                                        <div className="flex items-center space-x-2 mb-1">
+                                            <span className="text-[10px] bg-slate-800 px-2 py-0.5 rounded text-slate-400">{s.target_year}</span>
+                                            {s.mine_id && (
+                                                <span className="text-[10px] bg-indigo-500/20 px-2 py-0.5 rounded text-indigo-400 flex items-center">
+                                                    <Factory className="w-2 h-2 mr-1" />
+                                                    {mines.find(m => m.id === s.mine_id)?.name || 'Linked Unit'}
+                                                </span>
+                                            )}
+                                        </div>
                                         <div className="text-xs text-slate-500 truncate">{s.description || 'No description'}</div>
                                     </div>
                                 ))}
@@ -214,20 +241,29 @@ export function ScenarioPlanning() {
                             <h3 className="text-slate-100 font-bold mb-4">Define New Scenario</h3>
                             <form onSubmit={handleSubmit(handleCreateScenario)} className="space-y-4">
                                 <div>
-                                    <label className="text-xs text-slate-500 font-bold uppercase">Name</label>
-                                    <input {...register('name', { required: true })} className="w-full bg-slate-950 border border-slate-800 rounded p-2 text-slate-200 mt-1" placeholder="e.g. Aggressive Solar Push" />
+                                    <label className="text-xs text-slate-500 font-bold uppercase">Scenario Name</label>
+                                    <input {...register('name', { required: true })} className="w-full bg-slate-950 border border-slate-800 rounded p-2 text-slate-200 mt-1 focus:border-emerald-500 outline-none" placeholder="e.g. Aggressive Solar Push" />
                                 </div>
                                 <div>
-                                    <label className="text-xs text-slate-500 font-bold uppercase">Description</label>
-                                    <textarea {...register('description')} className="w-full bg-slate-950 border border-slate-800 rounded p-2 text-slate-200 mt-1" rows={2} placeholder="Description..." />
+                                    <label className="text-xs text-slate-500 font-bold uppercase">Associate with Unit</label>
+                                    <select {...register('mine_id', { required: true })} className="w-full bg-slate-950 border border-slate-800 rounded p-2 text-slate-200 mt-1 focus:border-emerald-500 outline-none">
+                                        <option value="">Select a Unit...</option>
+                                        {mines.map(m => (
+                                            <option key={m.id} value={m.id}>{m.name}</option>
+                                        ))}
+                                    </select>
                                 </div>
                                 <div>
                                     <label className="text-xs text-slate-500 font-bold uppercase">Target Year</label>
-                                    <select {...register('target_year')} className="w-full bg-slate-950 border border-slate-800 rounded p-2 text-slate-200 mt-1">
+                                    <select {...register('target_year')} className="w-full bg-slate-950 border border-slate-800 rounded p-2 text-slate-200 mt-1 focus:border-emerald-500 outline-none">
                                         <option value="2030">2030</option>
                                         <option value="2040">2040</option>
                                         <option value="2050">2050</option>
                                     </select>
+                                </div>
+                                <div>
+                                    <label className="text-xs text-slate-500 font-bold uppercase">Description</label>
+                                    <textarea {...register('description')} className="w-full bg-slate-950 border border-slate-800 rounded p-2 text-slate-200 mt-1 focus:border-emerald-500 outline-none" rows={2} placeholder="Briefly describe the objective..." />
                                 </div>
 
                                 <div className="pt-4">
@@ -269,7 +305,7 @@ export function ScenarioPlanning() {
                             </button>
                         </div>
 
-                        <div className="space-y-2 max-h-[300px] overflow-y-auto">
+                        <div className="space-y-2 max-h-[300px] overflow-y-auto custom-scrollbar">
                             {currentInterventions.map((item) => (
                                 <div
                                     key={item.id}

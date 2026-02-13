@@ -3,8 +3,9 @@ import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import dotenv from 'dotenv';
-import { pool } from './db/index.js'; // Added .js extension
-import { createTablesQuery } from './db/schema.js'; // Added .js extension
+import { GoogleGenerativeAI } from '@google/generative-ai';
+import { pool } from './db/index.js';
+import { createTablesQuery } from './db/schema.js';
 
 dotenv.config();
 
@@ -85,25 +86,32 @@ app.post('/api/mines', async (req, res) => {
 // Emission Factors (kg CO2e per unit)
 const EMISSION_FACTORS = {
     diesel: 2.68, // kg per Liter
-    grid_electricity: 0.82, // kg per kWh (India avg)
-    explosives: 0.19, // kg per kg (ANFO)
+    grid_electricity: 0.82, // kg per kWh
+    explosives: 0.19, // kg per kg
+    coal_power: 0.95, // kg per kWh (Captive coal)
+    transport: 0.15, // kg per ton-km (General rail/road)
+    default: 0.5     // Fallback
 };
 
 // Start Helper for calculating emissions
 const calculateEmission = (activity_type: string, amount: number) => {
     let co2e_tons = 0;
-    let factor = 0;
+    let factor = EMISSION_FACTORS.default;
+    const activity = activity_type.toLowerCase();
 
-    if (activity_type === 'diesel_combustion') {
+    if (activity.includes('diesel') || activity.includes('fuel')) {
         factor = EMISSION_FACTORS.diesel;
-        co2e_tons = (amount * factor) / 1000;
-    } else if (activity_type === 'grid_electricity') {
+    } else if (activity.includes('electricity') || activity.includes('grid')) {
         factor = EMISSION_FACTORS.grid_electricity;
-        co2e_tons = (amount * factor) / 1000;
-    } else if (activity_type === 'explosives') {
+    } else if (activity.includes('coal') || activity.includes('power')) {
+        factor = EMISSION_FACTORS.coal_power;
+    } else if (activity.includes('explosive') || activity.includes('blasting')) {
         factor = EMISSION_FACTORS.explosives;
-        co2e_tons = (amount * factor) / 1000;
+    } else if (activity.includes('transport') || activity.includes('rail')) {
+        factor = EMISSION_FACTORS.transport;
     }
+
+    co2e_tons = (amount * factor) / 1000;
     return co2e_tons;
 };
 // End Helper
@@ -223,6 +231,75 @@ app.get('/api/analytics/summary', async (req, res) => {
     }
 });
 
+// Detailed Analytics Breakdown
+app.get('/api/analytics/detailed', async (req, res) => {
+    try {
+        if (!process.env.DATABASE_URL) {
+            return res.json({
+                byActivity: [],
+                byScope: [],
+                monthlyTrend: []
+            });
+        }
+
+        // 1. By Activity
+        const activityResult = await pool.query(`
+            SELECT activity_type as name, SUM(co2e_tons) as value 
+            FROM emission_entries 
+            GROUP BY activity_type
+        `);
+
+        // Add colors for UI
+        const colors: any = {
+            diesel: '#f59e0b',
+            grid_electricity: '#3b82f6',
+            explosives: '#ef4444'
+        };
+        const byActivity = activityResult.rows.map(r => ({
+            ...r,
+            value: parseFloat(r.value),
+            color: colors[r.name] || '#6366f1'
+        }));
+
+        // 2. By Scope
+        const scopeResult = await pool.query(`
+            SELECT scope as name, SUM(co2e_tons) as value 
+            FROM emission_entries 
+            GROUP BY scope
+        `);
+        const scopeColors: any = {
+            scope1: '#10b981',
+            scope2: '#6366f1',
+            scope3: '#a855f7'
+        };
+        const byScope = scopeResult.rows.map(r => ({
+            ...r,
+            value: parseFloat(r.value),
+            color: scopeColors[r.name] || '#94a3b8'
+        }));
+
+        // 3. Monthly Trend
+        const trendResult = await pool.query(`
+            SELECT 
+                TO_CHAR(date, 'Mon') as name, 
+                SUM(co2e_tons) as emissions,
+                MIN(date) as sort_date
+            FROM emission_entries 
+            GROUP BY TO_CHAR(date, 'Mon')
+            ORDER BY MIN(date)
+        `);
+        const monthlyTrend = trendResult.rows.map(r => ({
+            name: r.name,
+            emissions: parseFloat(r.emissions)
+        }));
+
+        res.json({ byActivity, byScope, monthlyTrend });
+    } catch (err: any) {
+        console.error(err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // Get Scenarios
 app.get('/api/scenarios', async (req, res) => {
     try {
@@ -247,12 +324,124 @@ app.post('/api/scenarios', async (req, res) => {
             VALUES ($1, $2, $3, $4, $5)
             RETURNING *
         `;
-        const values = [mine_id, name, description, target_year, JSON.stringify(interventions)];
+        const values = [mine_id || null, name, description, target_year, JSON.stringify(interventions)];
         const result = await pool.query(query, values);
         res.json(result.rows[0]);
     } catch (err: any) {
         console.error(err);
         res.status(500).json({ error: err.message });
+    }
+});
+
+// Delete Scenario
+app.delete('/api/scenarios/:id', async (req, res) => {
+    const { id } = req.params;
+    try {
+        if (!process.env.DATABASE_URL) return res.json({ success: true });
+        await pool.query('DELETE FROM scenarios WHERE id = $1', [id]);
+        res.json({ success: true });
+    } catch (err: any) {
+        console.error(err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Export Emissions Data (CSV)
+app.get('/api/emissions/export', async (req, res) => {
+    try {
+        if (!process.env.DATABASE_URL) return res.json([]);
+        const result = await pool.query(`
+            SELECT m.name as mine_name, e.activity_type, e.scope, e.date, e.amount, e.unit, e.co2e_tons 
+            FROM emission_entries e
+            LEFT JOIN mines m ON e.mine_id = m.id
+            ORDER BY e.date DESC
+        `);
+        res.json(result.rows);
+    } catch (err: any) {
+        console.error(err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Generate AI Report
+app.post('/api/reports/generate', async (req, res) => {
+    try {
+        const { topic } = req.body;
+        const apiKey = process.env.GEMINI_API_KEY;
+
+        console.log(`[AI Report] Request for topic: "${topic}"`);
+
+        if (!apiKey) {
+            console.error('[AI Report] Missing GEMINI_API_KEY');
+            return res.status(500).json({ error: 'GEMINI_API_KEY is not configured on the server.' });
+        }
+
+        // 1. Gather Context Data
+        let contextData: any = {};
+
+        if (process.env.DATABASE_URL) {
+            try {
+                // Get Summary Stats
+                const totalRes = await pool.query('SELECT SUM(co2e_tons) as total FROM emission_entries');
+                contextData.totalEmissions = parseFloat(totalRes.rows[0].total || 0).toFixed(2);
+
+                // Get Top Emitters
+                const topRes = await pool.query(`
+                    SELECT activity_type, SUM(co2e_tons) as total 
+                    FROM emission_entries 
+                    GROUP BY activity_type 
+                    ORDER BY total DESC 
+                    LIMIT 3
+                `);
+                contextData.topSources = topRes.rows;
+
+                // Get Scenarios
+                const scenRes = await pool.query('SELECT name, target_year, description FROM scenarios LIMIT 3');
+                contextData.scenarios = scenRes.rows;
+            } catch (dbErr) {
+                console.error('[AI Report] DB Context Error:', dbErr);
+            }
+        }
+
+        // 2. Construct Prompt
+        const prompt = `
+            You are an expert environmental consultant for an industrial mining company.
+            Generate a detailed strategic analysis section for a report on: "${topic || 'General Decarbonization Strategy'}".
+            
+            Current Operational Data:
+            - Total Annual Emissions (Scope 1 & 2): ${contextData.totalEmissions || '0'} Metric Tons CO2e
+            - Top Emission Sources: ${JSON.stringify(contextData.topSources || [])}
+            - Active Planning Scenarios: ${JSON.stringify(contextData.scenarios || [])}
+
+            Please provide the following sections in Markdown format:
+            ## Analysis of Current State
+            (Analyze the provided data, identifying key hotspots and inefficiencies)
+
+            ## Strategic Recommendations
+            (Propose 3-4 specific, actionable high-impact interventions suited for mining operations, e.g., renewable adoption, fleet electrification)
+
+            ## Projected Impact
+            (Estimate the potential reduction percentages and long-term benefits of these interventions)
+
+            Keep the tone professional, data-driven, and concise. Do not include a title or executive summary, just the analysis sections.
+        `;
+
+        // 3. Call Gemini
+        console.log('[AI Report] Sending prompt to Gemini (model: gemini-2.0-flash)...');
+        const genAI = new GoogleGenerativeAI(apiKey);
+        const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+
+        const result = await model.generateContent(prompt);
+        const response = await result.response;
+        const text = response.text();
+
+        console.log('[AI Report] Success.');
+        res.json({ report: text });
+
+    } catch (err: any) {
+        console.error('[AI Report] Generation Error:', err);
+        const msg = err.message || JSON.stringify(err);
+        res.status(500).json({ error: 'Failed to generate report: ' + msg });
     }
 });
 

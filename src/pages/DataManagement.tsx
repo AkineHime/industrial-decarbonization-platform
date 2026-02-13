@@ -1,12 +1,27 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { FileUpload } from '../components/data/FileUpload';
-import { Table, AlertTriangle, CheckCircle, Save } from 'lucide-react';
+import { Table, AlertTriangle, CheckCircle, Save, Copy, Info } from 'lucide-react';
 import { cn } from '../lib/utils';
 import * as XLSX from 'xlsx';
 
 export function DataManagement() {
     const [data, setData] = useState<any[]>([]);
     const [validated, setValidated] = useState(false);
+    const [mines, setMines] = useState<any[]>([]);
+    const [copySuccess, setCopySuccess] = useState<string | null>(null);
+
+    useEffect(() => {
+        const fetchMines = async () => {
+            try {
+                const res = await fetch('http://localhost:3000/api/mines');
+                const result = await res.json();
+                setMines(result);
+            } catch (error) {
+                console.error('Failed to fetch mines:', error);
+            }
+        };
+        fetchMines();
+    }, []);
 
     const handleDataLoaded = (uploadedData: any[]) => {
         setData(uploadedData);
@@ -21,18 +36,19 @@ export function DataManagement() {
     };
 
     const handleDownloadTemplate = () => {
+        const firstMineId = mines.length > 0 ? mines[0].id : '00000000-0000-0000-0000-000000000000';
         const templateData = [
             {
-                mine_id: 'Example Mine ID',
+                mine_id: firstMineId,
                 activity_type: 'diesel_combustion',
-                date: '2023-01-01',
+                date: new Date().toISOString().split('T')[0],
                 amount: 500,
                 unit: 'L'
             },
             {
-                mine_id: 'Example Mine ID',
+                mine_id: firstMineId,
                 activity_type: 'grid_electricity',
-                date: '2023-01-01',
+                date: new Date().toISOString().split('T')[0],
                 amount: 1000,
                 unit: 'kWh'
             }
@@ -44,16 +60,20 @@ export function DataManagement() {
         XLSX.writeFile(wb, "emissions_data_template.xlsx");
     };
 
+    const copyToClipboard = (text: string) => {
+        navigator.clipboard.writeText(text);
+        setCopySuccess(text);
+        setTimeout(() => setCopySuccess(null), 2000);
+    };
+
     const handleCommit = async () => {
         if (!data.length) return;
 
         try {
-            // Transform data if needed, or assume it matches schema
-            // For now assuming headers match: mine_id, activity_type, date, amount, unit
             const payload = {
                 entries: data.map(row => ({
-                    mine_id: row.mine_id || null, // Ensure mine_id is present or handled
-                    activity_type: row.activity_type || 'diesel_combustion', // Default or validate
+                    mine_id: row.mine_id,
+                    activity_type: row.activity_type || 'diesel_combustion',
                     date: row.date || new Date().toISOString(),
                     amount: row.amount || 0,
                     unit: row.unit || 'L'
@@ -99,8 +119,34 @@ export function DataManagement() {
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* Upload Section */}
+                {/* Reference IDs & Upload Section */}
                 <div className="lg:col-span-1 space-y-6">
+                    {/* Reference Table */}
+                    <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-lg">
+                        <h3 className="text-slate-100 font-bold mb-4 flex items-center">
+                            <Info className="w-5 h-5 mr-2 text-blue-400" />
+                            Valid Mine IDs
+                        </h3>
+                        <p className="text-xs text-slate-500 mb-4">Use these IDs in your Excel/CSV file to link data to correct units.</p>
+                        <div className="space-y-2 max-h-48 overflow-auto pr-2 custom-scrollbar">
+                            {mines.map((mine) => (
+                                <div key={mine.id} className="p-3 bg-slate-950 rounded-xl border border-slate-800 flex justify-between items-center group">
+                                    <div className="overflow-hidden mr-2">
+                                        <div className="text-slate-200 font-bold text-xs truncate">{mine.name}</div>
+                                        <div className="text-slate-600 text-[10px] font-mono truncate">{mine.id}</div>
+                                    </div>
+                                    <button
+                                        onClick={() => copyToClipboard(mine.id)}
+                                        className="p-1.5 hover:bg-slate-800 rounded-lg text-slate-500 hover:text-emerald-400 transition-all"
+                                        title="Copy UUID"
+                                    >
+                                        {copySuccess === mine.id ? <CheckCircle className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
                     <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-lg">
                         <h3 className="text-slate-100 font-bold mb-4 flex items-center">
                             <Table className="w-5 h-5 mr-2 text-emerald-500" />
@@ -113,7 +159,7 @@ export function DataManagement() {
                             <ul className="list-disc pl-4 space-y-1">
                                 <li>Maximum file size: 50MB</li>
                                 <li>Supported formats: .xlsx, .csv</li>
-                                <li>Must follow the V2.3 Data Template</li>
+                                <li><strong>mine_id</strong> must be a valid UUID</li>
                             </ul>
                         </div>
                     </div>

@@ -145,7 +145,10 @@ export function Dashboard() {
                             </div>
                         </div>
 
-                        <ProjectedOffset nextPhase={nextPhaseStr} />
+                        <ProjectedOffset
+                            offset={stats.totalReduction}
+                            nextPhase={nextPhaseStr}
+                        />
                     </div>
 
                     {/* Main Chart */}
