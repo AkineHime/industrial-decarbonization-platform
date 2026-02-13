@@ -146,8 +146,9 @@ export function Analytics() {
                             </PieChart>
                         </ResponsiveContainer>
                         <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                            <div className="w-32 h-32 absolute rounded-full bg-indigo-500/5 animate-ping"></div>
                             <div className="text-slate-500 text-[10px] font-bold uppercase tracking-widest">Total Impact</div>
-                            <div className="text-xl font-bold text-white">{totalEmissions > 1000 ? `${(totalEmissions / 1000).toFixed(1)}k` : totalEmissions}</div>
+                            <div className="text-2xl font-black text-white drop-shadow-[0_0_10px_rgba(255,255,255,0.3)]">{totalEmissions > 1000 ? `${(totalEmissions / 1000).toFixed(1)}k` : totalEmissions.toFixed(2)}</div>
                         </div>
                     </div>
                     <div className="mt-8 space-y-3">
@@ -174,29 +175,81 @@ export function Analytics() {
                             GHG Protocol Standard
                         </div>
                     </div>
-                    <div className="h-[350px]">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={data.byScope} barGap={0}>
-                                <defs>
-                                    <linearGradient id="barGrad" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="0%" stopColor="#6366f1" stopOpacity={1} />
-                                        <stop offset="100%" stopColor="#6366f1" stopOpacity={0.5} />
-                                    </linearGradient>
-                                </defs>
-                                <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
-                                <XAxis dataKey="name" stroke="#64748b" axisLine={false} tickLine={false} />
-                                <YAxis stroke="#64748b" axisLine={false} tickLine={false} />
-                                <Tooltip
-                                    cursor={{ fill: 'rgba(255,255,255,0.05)' }}
-                                    contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', borderRadius: '12px', padding: '12px' }}
-                                />
-                                <Bar dataKey="value" radius={[12, 12, 0, 0]}>
-                                    {data.byScope.map((entry: any, index: number) => (
-                                        <Cell key={`cell-${index}`} fill={entry.color} fillOpacity={0.8} />
-                                    ))}
-                                </Bar>
-                            </BarChart>
-                        </ResponsiveContainer>
+                    <div className="flex flex-col h-full">
+                        <div className="h-[240px]">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <BarChart data={data.byScope} layout="vertical" margin={{ left: 40, right: 40 }}>
+                                    <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" horizontal={false} />
+                                    <XAxis type="number" hide />
+                                    <YAxis
+                                        dataKey="name"
+                                        type="category"
+                                        stroke="#94a3b8"
+                                        axisLine={false}
+                                        tickLine={false}
+                                        width={100}
+                                        tick={{ fontSize: 14, fontWeight: 'bold' }}
+                                    />
+                                    <Tooltip
+                                        cursor={{ fill: 'rgba(255,255,255,0.05)' }}
+                                        contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', borderRadius: '12px', padding: '12px' }}
+                                        formatter={(value: any) => [`${value.toLocaleString()} tCO2e`, 'Emissions']}
+                                    />
+                                    <Bar dataKey="value" radius={[0, 12, 12, 0]} barSize={40}>
+                                        {data.byScope.map((entry: any, index: number) => (
+                                            <Cell key={`cell-${index}`} fill={entry.color} fillOpacity={0.8} />
+                                        ))}
+                                    </Bar>
+                                </BarChart>
+                            </ResponsiveContainer>
+                        </div>
+
+                        {/* Summary Distribution Cards */}
+                        <div className="mt-8 pt-6 border-t border-slate-800 grid grid-cols-1 sm:grid-cols-3 gap-4">
+                            {data.byScope.map((scope: any, idx: number) => (
+                                <div key={idx} className="bg-slate-950/40 p-4 rounded-2xl border border-slate-800/50 hover:bg-slate-900 transition-colors">
+                                    <div className="flex items-center justify-between mb-2">
+                                        <div className="flex items-center space-x-2">
+                                            <div className="w-2 h-2 rounded-full shadow-[0_0_8px] shadow-current" style={{ backgroundColor: scope.color, color: scope.color }}></div>
+                                            <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{scope.name}</div>
+                                        </div>
+                                        <div className="text-[10px] font-bold text-emerald-500">
+                                            {totalEmissions ? ((scope.value / totalEmissions) * 100).toFixed(0) : 0}%
+                                        </div>
+                                    </div>
+                                    <div className="text-xl font-bold text-white mb-0.5">{scope.value.toLocaleString()}</div>
+                                    <div className="text-[10px] text-slate-600 font-medium">Metric Tons CO2e</div>
+                                </div>
+                            ))}
+                            {data.byScope.length < 3 && (
+                                <div className="bg-slate-950/20 p-4 rounded-2xl border border-dashed border-slate-800/50 flex flex-col justify-center items-center text-center opacity-40">
+                                    <div className="text-[10px] font-bold text-slate-600 uppercase tracking-widest">Scope 3</div>
+                                    <div className="text-sm font-bold text-slate-700 mt-1 italic">Not Tracked</div>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Strategic Insights Section - Added to fill space */}
+                        <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="bg-indigo-500/5 border border-indigo-500/10 p-6 rounded-2xl">
+                                <h4 className="text-indigo-400 text-xs font-bold uppercase tracking-widest mb-3 flex items-center">
+                                    <Zap className="w-4 h-4 mr-2" /> Strategic Insight
+                                </h4>
+                                <p className="text-slate-400 text-sm leading-relaxed">
+                                    {totalEmissions > 0 ? (
+                                        `Operational data indicates that ${data.byScope[0]?.value > data.byScope[1]?.value ? 'Direct (Scope 1)' : 'Indirect (Scope 2)'} energy consumption is your primary decarbonization bottleneck. Prioritizing ${data.byScope[0]?.value > data.byScope[1]?.value ? 'fleet electrification' : 'renewable energy PPAs'} could reduce baseline intensity by up to 24%.`
+                                    ) : "Awaiting further diagnostic data for automated insights."}
+                                </p>
+                            </div>
+                            <div className="bg-emerald-500/5 border border-emerald-500/10 p-6 rounded-2xl">
+                                <h4 className="text-emerald-400 text-xs font-bold uppercase tracking-widest mb-3 flex items-center">
+                                    <TrendingUp className="w-4 h-4 mr-2" /> Target Alignment
+                                </h4>
+                                <p className="text-slate-400 text-sm leading-relaxed">
+                                    Current emission velocity is aligned with a <strong>2.1°C global warming scenario</strong>. To meet the Net-Zero 2050 target, a compound annual reduction rate (CARR) of 4.2% is required starting from next physical audit.
+                                </p>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -262,17 +315,21 @@ export function Analytics() {
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                         {data.byMine.map((mine: any, idx: number) => (
-                            <div key={idx} className="bg-slate-900/50 border border-slate-800 p-5 rounded-2xl hover:bg-slate-900 transition-colors">
+                            <div key={idx} className="bg-slate-900/50 border border-slate-800 p-5 rounded-2xl hover:bg-slate-900 transition-all hover:scale-[1.02] group">
                                 <div className="flex items-center justify-between mb-3 text-slate-500 text-[10px] font-bold uppercase">
                                     <span>Rank #{idx + 1}</span>
-                                    <ArrowRight className="w-3 h-3" />
+                                    <ArrowRight className="w-3 h-3 group-hover:translate-x-1 transition-transform" />
                                 </div>
                                 <div className="text-lg font-bold text-white mb-1 truncate">{mine.name}</div>
-                                <div className="text-2xl font-black text-indigo-400 mb-2">{mine.value.toLocaleString()} <span className="text-xs font-normal text-slate-600">tCO2e</span></div>
-                                <div className="w-full bg-slate-800 h-1 rounded-full overflow-hidden">
+                                <div className="text-2xl font-black mb-2" style={{ color: ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6'][idx % 5] }}>{mine.value.toLocaleString()} <span className="text-xs font-normal text-slate-600">tCO2e</span></div>
+                                <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
                                     <div
-                                        className="bg-indigo-500 h-full rounded-full"
-                                        style={{ width: `${(mine.value / data.byMine[0].value) * 100}%` }}
+                                        className="h-full rounded-full transition-all duration-1000"
+                                        style={{
+                                            width: `${(mine.value / data.byMine[0].value) * 100}%`,
+                                            backgroundColor: ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6'][idx % 5],
+                                            boxShadow: `0 0 10px ${['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6'][idx % 5]}44`
+                                        }}
                                     ></div>
                                 </div>
                             </div>

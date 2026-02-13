@@ -249,16 +249,35 @@ app.get('/api/analytics/detailed', async (req, res) => {
             FROM emission_entries 
             GROUP BY activity_type
         `);
-        const colors: any = {
+        const totalActivities = activityResult.rows.length;
+        const brandColors: any = {
             diesel: '#f59e0b',
+            diesel_combustion: '#f59e0b',
             grid_electricity: '#3b82f6',
-            explosives: '#ef4444'
+            explosives: '#ef4444',
+            explosives_anfo: '#ef4444',
+            coal_power: '#8b5cf6',
+            captive_coal_power: '#8b5cf6',
         };
-        const byActivity = activityResult.rows.map(r => ({
-            name: r.name.charAt(0).toUpperCase() + r.name.slice(1).replace('_', ' '),
-            value: parseFloat(r.value),
-            color: colors[r.name] || '#6366f1'
-        }));
+
+        const byActivity = activityResult.rows.map((r, idx) => {
+            const normalized = r.name.toLowerCase().replace(/ /g, '_');
+
+            // Priority 1: Brand Color
+            let color = brandColors[normalized];
+
+            // Priority 2: Dynamic HSL generation for high contrast
+            if (!color) {
+                const hue = (idx * (360 / Math.max(totalActivities, 1))) % 360;
+                color = `hsl(${hue}, 70%, 60%)`;
+            }
+
+            return {
+                name: r.name.charAt(0).toUpperCase() + r.name.slice(1).replace(/_/g, ' '),
+                value: parseFloat(r.value),
+                color: color
+            };
+        });
 
         // 2. By Scope
         const scopeResult = await pool.query(`
@@ -272,7 +291,7 @@ app.get('/api/analytics/detailed', async (req, res) => {
             scope3: '#a855f7'
         };
         const byScope = scopeResult.rows.map(r => ({
-            name: r.name.charAt(0).toUpperCase() + r.name.slice(1),
+            name: r.name.charAt(0).toUpperCase() + r.name.slice(1, 5) + ' ' + r.name.slice(5),
             value: parseFloat(r.value),
             color: scopeColors[r.name] || '#94a3b8'
         }));

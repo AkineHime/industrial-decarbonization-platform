@@ -1,4 +1,3 @@
-import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { DashboardLayout } from './components/layout/DashboardLayout';
 import { Dashboard } from './pages/Dashboard';
@@ -8,6 +7,7 @@ import { ScenarioPlanning } from './pages/ScenarioPlanning';
 import { Reports } from './pages/Reports';
 import { Analytics } from './pages/Analytics';
 import { Units } from './pages/Units';
+import { Settings } from './pages/Settings';
 
 function App() {
   return (
@@ -21,6 +21,7 @@ function App() {
           <Route path="/scenarios" element={<ScenarioPlanning />} />
           <Route path="/reports" element={<Reports />} />
           <Route path="/analytics" element={<Analytics />} />
+          <Route path="/settings" element={<Settings />} />
         </Routes>
       </DashboardLayout>
     </Router>

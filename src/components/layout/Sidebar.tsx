@@ -1,9 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import {
     LayoutGrid,
     BarChart2,
     Factory,
-    Wallet,
     Settings,
     Leaf,
     FileText,
@@ -65,8 +64,20 @@ export function Sidebar() {
 
             {/* Bottom Actions */}
             <div className="mt-auto space-y-4 w-full px-3">
-                <button className="w-12 h-12 flex items-center justify-center rounded-xl text-slate-500 hover:bg-slate-900 hover:text-slate-300 transition-all duration-300 mx-auto">
+                <button
+                    onClick={() => navigate('/settings')}
+                    className={cn(
+                        "w-12 h-12 flex items-center justify-center rounded-xl transition-all duration-300 mx-auto group relative",
+                        activePath === '/settings'
+                            ? "bg-slate-800 text-emerald-400 shadow-lg shadow-slate-900/50"
+                            : "text-slate-500 hover:bg-slate-900 hover:text-slate-300"
+                    )}
+                >
                     <Settings className="w-6 h-6" />
+                    {/* Tooltip */}
+                    <div className="absolute left-14 px-3 py-1.5 bg-slate-800 text-slate-200 text-xs font-medium rounded-md opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none border border-slate-700 z-50">
+                        Settings
+                    </div>
                 </button>
             </div>
         </aside>
