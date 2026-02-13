@@ -1,73 +1,78 @@
-# React + TypeScript + Vite
+# Industrial Decarbonization Platform
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A comprehensive platform for monitoring, calculating, and strategizing industrial carbon emissions. Designed for mines, factories, and industrial hubs to achieve Net-Zero targets.
 
-Currently, two official plugins are available:
+## 🚀 Key Features
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+*   **Real-time Dashboard**: KPI monitoring and Net-Zero path forecasting.
+*   **Unit Management**: Register and manage industrial nodes (mines/factories).
+*   **Emissions Calculator**: Scope 1 & 2 calculations based on operational data.
+*   **Bulk Data Import**: Upload Excel/CSV files for high-volume operational updates.
+*   **Deep Analytics**: Multi-dimensional breakdown of emissions by source and scope.
+*   **Strategy Reports**: Generate and download Net-Zero Transition Plans and BRSR Disclosures.
 
-## React Compiler
+---
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## 🛠️ Installation Guide
 
-## Expanding the ESLint configuration
+Follow these steps to set up the project on your local machine.
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+### 1. Prerequisites
+Ensure you have the following installed:
+*   **Node.js** (v18 or higher)
+*   **npm** (comes with Node.js)
+*   **PostgreSQL** (Active database server)
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+### 2. Clone the Repository
+```bash
+git clone https://github.com/AkineHime/industrial-decarbonization-platform.git
+cd industrial-decarbonization-platform
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+### 3. Setup Frontend
+```bash
+# Install dependencies
+npm install
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+# Start development server
+npm run dev
 ```
+The frontend will run at `http://localhost:5173`.
+
+### 4. Setup Backend
+Open a new terminal window:
+```bash
+cd server
+
+# Install dependencies
+npm install
+
+# Create .env file for database connection
+# Set DATABASE_URL=postgresql://USERNAME:PASSWORD@localhost:5432/DATABASE_NAME
+```
+
+### 5. Database Configuration
+1.  Create a new PostgreSQL database.
+2.  In the `server` directory, ensure your `.env` file points to this database.
+3.  The tables will be automatically created on the first run.
+
+### 6. Start Backend
+```bash
+npm run dev
+```
+The backend API handles requests at `http://localhost:3000`.
+
+---
+
+## 🏗️ Tech Stack
+
+*   **Frontend**: React 19, TypeScript, Vite, Tailwind CSS, Recharts, Lucide Icons.
+*   **Backend**: Node.js, Express.js, PostgreSQL (pg).
+*   **Utilities**: jsPDF (Reports), XLSX (Data Management).
+
+---
+
+## 📈 Strategy Modes
+*   **Aggressive**: Target 50% reduction in emissions.
+*   **Standard**: Target 20% reduction in emissions.
+*   Toggle these modes on the dashboard to see different forecasting models.
