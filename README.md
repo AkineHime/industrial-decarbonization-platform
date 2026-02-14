@@ -1,6 +1,6 @@
-# Industrial Decarbonization Platform
+# EcoTrack: Industrial Decarbonization Platform
 
-A high-performance, enterprise-grade platform for monitoring, calculating, and strategizing industrial carbon emissions. Designed for mines, factories, and industrial hubs to achieve Net-Zero targets using data-driven insights and AI-powered strategy generation.
+EcoTrack is a high-performance, enterprise-grade platform for monitoring, calculating, and strategizing industrial carbon emissions. Designed for mines, factories, and industrial hubs to achieve Net-Zero targets using data-driven insights and AI-powered strategy generation.
 
 ## 🚀 Key Features
 
@@ -57,12 +57,20 @@ cd industrial-decarbonization-platform
 cd server
 npm install
 ```
-Create a `.env` file in the `server` folder:
+Create a `.env` file in the `server` folder. **Do not commit this file.**
 ```env
 PORT=3000
-DATABASE_URL=your_postgresql_or_cockroachdb_url
+DATABASE_URL=postgresql://<username>:<password>@<host>:<port>/<database>?sslmode=verify-full
 GEMINI_API_KEY=your_google_ai_key
 ```
+
+### 🔑 Getting your Database URL (CockroachDB)
+1. Sign up/Log in to [CockroachDB Cloud](https://cockroachlabs.cloud/).
+2. Create a standardized **Serverless Cluster**.
+3. Create a SQL User and save the password.
+4. Click **Connect** and copy the "General Connection String".
+5. Paste it into your `.env` file as `DATABASE_URL`.
+
 Run the server:
 ```bash
 npm run dev
@@ -93,3 +101,5 @@ The platform uses a relational schema optimized for time-series carbon data:
 *   `scenarios`: Decarbonization intervention plans.
 *   `budget_items`: Capex/Opex tracking for decarbonization projects.
 *   `renewable_energy`: Renewable asset registry and generation logs.
+
+> 📝 **Developer Note**: A complete SQL schema reference is available in [`SCHEMA_REFERENCE.sql`](./SCHEMA_REFERENCE.sql) for manual setup or reference.
