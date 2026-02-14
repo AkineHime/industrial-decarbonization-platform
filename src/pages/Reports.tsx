@@ -166,13 +166,14 @@ export function Reports() {
                 const total = data.reduce((sum: number, d: any) => sum + Number(d.co2e_tons), 0);
                 const s1 = data.filter((d: any) => d.scope === 'scope1').reduce((sum: number, d: any) => sum + Number(d.co2e_tons), 0);
                 const s2 = data.filter((d: any) => d.scope === 'scope2').reduce((sum: number, d: any) => sum + Number(d.co2e_tons), 0);
+                const s3 = data.filter((d: any) => d.scope === 'scope3').reduce((sum: number, d: any) => sum + Number(d.co2e_tons), 0);
 
                 const summaryData = [
                     ["Metric", "Emissions (tCO2e)", "Contribution"],
-                    ["Total Scope 1 & 2", total.toFixed(2), "100%"],
+                    ["Total Scope 1, 2 & 3", total.toFixed(2), "100%"],
                     ["Scope 1 (Direct)", s1.toFixed(2), total ? ((s1 / total) * 100).toFixed(1) + '%' : '0%'],
                     ["Scope 2 (Indirect)", s2.toFixed(2), total ? ((s2 / total) * 100).toFixed(1) + '%' : '0%'],
-                    ["Scope 3 (Value Chain)", "0.00", "0% (Not captured)"]
+                    ["Scope 3 (Value Chain)", s3.toFixed(2), total ? ((s3 / total) * 100).toFixed(1) + '%' : '0%']
                 ];
                 const wsSummary = XLSX.utils.aoa_to_sheet(summaryData);
                 XLSX.utils.book_append_sheet(wb, wsSummary, "Summary");
@@ -188,7 +189,8 @@ export function Reports() {
                 XLSX.utils.book_append_sheet(wb, wsS2, "Scope 2");
 
                 // 5. Scope 3
-                const wsS3 = XLSX.utils.json_to_sheet([{ Info: "Scope 3 screening not yet conducted." }]);
+                const scope3Data = data.filter((d: any) => d.scope === 'scope3');
+                const wsS3 = XLSX.utils.json_to_sheet(scope3Data.length ? scope3Data : [{ Info: "No Scope 3 Data" }]);
                 XLSX.utils.book_append_sheet(wb, wsS3, "Scope 3");
 
                 // 6. Activity Data

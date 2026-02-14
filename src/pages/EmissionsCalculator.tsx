@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { Calculator, Save, AlertCircle, Check, Fuel, Zap, Bomb } from 'lucide-react';
 import { cn } from '../lib/utils';
@@ -9,17 +9,24 @@ export function EmissionsCalculator() {
     const [submitting, setSubmitting] = useState(false);
     const [success, setSuccess] = useState(false);
     const [calculatedEmission, setCalculatedEmission] = useState<number | null>(null);
-
     const activityType = watch('activity_type');
     const amount = watch('amount');
 
-    // Fetch mines for dropdown
     useEffect(() => {
-        fetch('http://localhost:3000/api/mines')
-            .then(res => res.json())
-            .then(data => setMines(data))
-            .catch(err => console.error('Failed to fetch mines', err));
+        fetchMines();
     }, []);
+
+    const fetchMines = async () => {
+        try {
+            const res = await fetch('http://localhost:3000/api/mines');
+            const data = await res.json();
+            setMines(data);
+        } catch (err) {
+            console.error('Failed to fetch mines', err);
+        }
+    };
+
+
 
     // Real-time calculation estimation
     useEffect(() => {
@@ -226,6 +233,7 @@ export function EmissionsCalculator() {
                     </div>
                 </div>
             </div>
+
         </div>
     );
 }

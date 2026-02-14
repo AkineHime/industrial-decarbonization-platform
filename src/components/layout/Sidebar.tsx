@@ -5,7 +5,8 @@ import {
     Factory,
     Settings,
     Leaf,
-    FileText,
+    Link,
+    Sun,
     Database,
     Calculator,
     Sliders
@@ -14,13 +15,14 @@ import { cn } from '../../lib/utils';
 import { useNavigate, useLocation } from 'react-router-dom';
 
 const NAV_ITEMS = [
-    { icon: LayoutGrid, label: 'Dashboard', path: '/' },
-    { icon: Factory, label: 'Units', path: '/units' },
-    { icon: Calculator, label: 'Calculator', path: '/calculator' },
-    { icon: Sliders, label: 'Scenarios', path: '/scenarios' },
+    { icon: LayoutGrid, label: 'Control Center', path: '/' },
+    { icon: Factory, label: 'Units & Assets', path: '/units' },
+    { icon: Calculator, label: 'Direct Inventory', path: '/calculator' },
+    { icon: Link, label: 'Value Chain (Scope 3)', path: '/scope3' },
+    { icon: Sun, label: 'Renewable Power', path: '/renewables' },
+    { icon: Sliders, label: 'Scenario Lab', path: '/scenarios' },
+    { icon: BarChart2, label: 'Deep Analytics', path: '/analytics' },
     { icon: Database, label: 'Data Management', path: '/data-management' },
-    { icon: BarChart2, label: 'Analytics', path: '/analytics' },
-    { icon: FileText, label: 'Reports', path: '/reports' },
 ];
 
 export function Sidebar() {

@@ -1,16 +1,30 @@
 import { useState, useEffect } from 'react';
 import { AreaChart, Area, PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { BarChart3, PieChart as PieIcon, Activity, Zap, TrendingUp, Factory, ArrowRight } from 'lucide-react';
+import { BarChart3, PieChart as PieIcon, Activity, Zap, TrendingUp, Factory, ArrowRight, MapPin, Plus } from 'lucide-react';
 
 export function Analytics() {
     const [data, setData] = useState<any>(null);
     const [loading, setLoading] = useState(true);
+    const [mines, setMines] = useState<any[]>([]);
+    const [selectedMine, setSelectedMine] = useState<string>('all');
+
+    useEffect(() => {
+        // Fetch list of mines for the filter
+        fetch('http://localhost:3000/api/mines')
+            .then(res => res.json())
+            .then(data => setMines(data))
+            .catch(err => console.error(err));
+    }, []);
 
     useEffect(() => {
         const fetchDetailedData = async () => {
             setLoading(true);
             try {
-                const res = await fetch('http://localhost:3000/api/analytics/detailed');
+                const url = selectedMine === 'all'
+                    ? 'http://localhost:3000/api/analytics/detailed'
+                    : `http://localhost:3000/api/analytics/detailed?mine_id=${selectedMine}`;
+
+                const res = await fetch(url);
                 const result = await res.json();
 
                 if (!result.byActivity || result.byActivity.length === 0) {
@@ -18,6 +32,8 @@ export function Analytics() {
                         byActivity: [{ name: 'N/A', value: 0, color: '#1e293b' }],
                         byScope: [{ name: 'N/A', value: 0, color: '#1e293b' }],
                         byMine: [],
+                        byState: [],
+                        byGrid: [],
                         monthlyTrend: []
                     });
                 } else {
@@ -31,7 +47,7 @@ export function Analytics() {
         };
 
         fetchDetailedData();
-    }, []);
+    }, [selectedMine]);
 
     if (loading) {
         return (
@@ -45,6 +61,63 @@ export function Analytics() {
     const totalEmissions = data.byActivity.reduce((acc: number, curr: any) => acc + curr.value, 0);
     const topSource = data.byActivity.length > 0 ? data.byActivity.sort((a: any, b: any) => b.value - a.value)[0] : null;
 
+    if (totalEmissions === 0 && selectedMine !== 'all') {
+        return (
+            <div className="space-y-8 animate-in fade-in duration-700">
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                    <div className="flex items-center space-x-4">
+                        <div className="p-3 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl text-white shadow-lg shadow-indigo-500/20">
+                            <BarChart3 className="w-8 h-8" />
+                        </div>
+                        <div>
+                            <h1 className="text-3xl font-bold text-slate-100 italic tracking-tight">Environmental Intelligence</h1>
+                            <p className="text-slate-500">Unit-specific carbon data monitoring.</p>
+                        </div>
+                    </div>
+                    <div className="flex items-center space-x-4">
+                        <select
+                            value={selectedMine}
+                            onChange={(e) => setSelectedMine(e.target.value)}
+                            className="bg-slate-900 border border-slate-700 text-slate-300 text-sm font-bold rounded-xl px-4 py-2 focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
+                        >
+                            <option value="all">Global Monitoring (All Units)</option>
+                            {mines.map(m => (
+                                <option key={m.id} value={m.id}>{m.name}</option>
+                            ))}
+                        </select>
+                    </div>
+                </div>
+
+                <div className="flex flex-col items-center justify-center py-32 bg-slate-900/50 border-2 border-dashed border-slate-800 rounded-[3rem]">
+                    <div className="p-6 bg-slate-800/50 rounded-full mb-6 text-slate-500">
+                        <Activity className="w-16 h-16 opacity-30" />
+                    </div>
+                    <h2 className="text-2xl font-bold text-slate-300 mb-2">No Emissions Found for this Unit</h2>
+                    <p className="text-slate-500 max-w-md text-center">
+                        This unit currently has no recorded emission entries. Add data via the Emissions Calculator or Bulk Import to see localized intelligence.
+                    </p>
+                </div>
+            </div>
+        );
+    }
+
+    if (totalEmissions === 0 && mines.length === 0) {
+        return (
+            <div className="flex flex-col items-center justify-center py-40">
+                <div className="p-8 bg-slate-900 border border-slate-800 rounded-[3rem] text-center max-w-lg shadow-2xl">
+                    <Activity className="w-20 h-20 text-slate-700 mx-auto mb-6" />
+                    <h2 className="text-3xl font-bold text-slate-100 mb-4 tracking-tight">Intelligence Map Empty</h2>
+                    <p className="text-slate-500 mb-8 leading-relaxed">
+                        To activate environmental intelligence, you need to register industrial units and upload your first emission datasets.
+                    </p>
+                    <a href="/units" className="inline-flex items-center px-6 py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-2xl transition-all shadow-xl shadow-indigo-600/20">
+                        <Plus className="w-5 h-5 mr-2" />
+                        Setup Industrial Grid
+                    </a>
+                </div>
+            </div>
+        );
+    }
     return (
         <div className="space-y-8 animate-in fade-in duration-700">
             {/* Header */}
@@ -58,9 +131,21 @@ export function Analytics() {
                         <p className="text-slate-500">Multidimensional breakdown of carbon intensity and emission hotspots.</p>
                     </div>
                 </div>
-                <div className="flex items-center space-x-2 bg-indigo-500/10 border border-indigo-500/20 px-4 py-2 rounded-xl">
-                    <div className="w-2 h-2 bg-indigo-500 rounded-full animate-pulse mr-2"></div>
-                    <span className="text-indigo-400 text-sm font-bold uppercase tracking-wider">Live Monitoring</span>
+                <div className="flex items-center space-x-4">
+                    <select
+                        value={selectedMine}
+                        onChange={(e) => setSelectedMine(e.target.value)}
+                        className="bg-slate-900 border border-slate-700 text-slate-300 text-sm font-bold rounded-xl px-4 py-2 focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
+                    >
+                        <option value="all">Global Monitoring (All Units)</option>
+                        {mines.map(m => (
+                            <option key={m.id} value={m.id}>{m.name}</option>
+                        ))}
+                    </select>
+                    <div className="flex items-center space-x-2 bg-indigo-500/10 border border-indigo-500/20 px-4 py-2 rounded-xl">
+                        <div className="w-2 h-2 bg-indigo-500 rounded-full animate-pulse mr-2"></div>
+                        <span className="text-indigo-400 text-sm font-bold uppercase tracking-wider">Live Monitoring</span>
+                    </div>
                 </div>
             </div>
 
@@ -193,6 +278,7 @@ export function Analytics() {
                                     <Tooltip
                                         cursor={{ fill: 'rgba(255,255,255,0.05)' }}
                                         contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', borderRadius: '12px', padding: '12px' }}
+                                        itemStyle={{ color: '#e2e8f0' }}
                                         formatter={(value: any) => [`${value.toLocaleString()} tCO2e`, 'Emissions']}
                                     />
                                     <Bar dataKey="value" radius={[0, 12, 12, 0]} barSize={40}>
@@ -253,6 +339,79 @@ export function Analytics() {
                     </div>
                 </div>
 
+                {/* Regional Breakdown (New Section) */}
+                <div className="col-span-12 lg:col-span-6 bg-slate-900 border border-slate-800 rounded-3xl p-8">
+                    <div className="flex items-center justify-between mb-8">
+                        <h3 className="text-lg font-bold text-slate-100 flex items-center">
+                            <MapPin className="w-5 h-5 mr-3 text-emerald-400" />
+                            Emissions by State
+                        </h3>
+                    </div>
+                    <div className="h-[300px]">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={data.byState} layout="vertical" margin={{ left: 60, right: 30 }}>
+                                <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" horizontal={false} />
+                                <XAxis type="number" hide />
+                                <YAxis
+                                    dataKey="name"
+                                    type="category"
+                                    stroke="#94a3b8"
+                                    axisLine={false}
+                                    tickLine={false}
+                                    tick={{ fontSize: 12, fontWeight: 'medium' }}
+                                />
+                                <Tooltip
+                                    cursor={{ fill: 'rgba(255,255,255,0.05)' }}
+                                    contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', borderRadius: '12px' }}
+                                    itemStyle={{ color: '#e2e8f0' }}
+                                />
+                                <Bar dataKey="value" fill="#10b981" radius={[0, 10, 10, 0]} barSize={24} />
+                            </BarChart>
+                        </ResponsiveContainer>
+                    </div>
+                </div>
+
+                <div className="col-span-12 lg:col-span-6 bg-slate-900 border border-slate-800 rounded-3xl p-8">
+                    <div className="flex items-center justify-between mb-8">
+                        <h3 className="text-lg font-bold text-slate-100 flex items-center">
+                            <Zap className="w-5 h-5 mr-3 text-blue-400" />
+                            Grid Distribution
+                        </h3>
+                    </div>
+                    <div className="h-[300px]">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <PieChart>
+                                <Pie
+                                    data={data.byGrid}
+                                    cx="50%"
+                                    cy="50%"
+                                    innerRadius={60}
+                                    outerRadius={90}
+                                    paddingAngle={5}
+                                    dataKey="value"
+                                    stroke="none"
+                                >
+                                    {data.byGrid.map((entry: any, index: number) => (
+                                        <Cell key={`cell-${index}`} fill={entry.color} />
+                                    ))}
+                                </Pie>
+                                <Tooltip
+                                    contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', borderRadius: '12px' }}
+                                    itemStyle={{ color: '#e2e8f0' }}
+                                />
+                            </PieChart>
+                        </ResponsiveContainer>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 mt-4">
+                        {data.byGrid.map((grid: any, idx: number) => (
+                            <div key={idx} className="flex items-center text-[10px] text-slate-400">
+                                <div className="w-2 h-2 rounded-full mr-2" style={{ backgroundColor: grid.color }}></div>
+                                <span className="truncate">{grid.name}: {grid.value.toLocaleString()} t</span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+
                 {/* Trend Analysis */}
                 <div className="col-span-12 bg-slate-900 border border-slate-800 rounded-3xl p-8">
                     <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-10">
@@ -268,42 +427,45 @@ export function Analytics() {
                         </div>
                     </div>
                     <div className="h-80 w-full mb-8">
-                        <ResponsiveContainer width="100%" height="100%">
+                        <div className="h-full w-full">
                             {data.monthlyTrend.length > 0 ? (
-                                <AreaChart data={data.monthlyTrend}>
-                                    <defs>
-                                        <linearGradient id="colorTrend" x1="0" y1="0" x2="0" y2="1">
-                                            <stop offset="5%" stopColor="#10b981" stopOpacity={0.2} />
-                                            <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
-                                        </linearGradient>
-                                        <linearGradient id="colorStroke" x1="0" y1="0" x2="0" y2="1">
-                                            <stop offset="0%" stopColor="#10b981" stopOpacity={1} />
-                                            <stop offset="100%" stopColor="#6366f1" stopOpacity={1} />
-                                        </linearGradient>
-                                    </defs>
-                                    <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
-                                    <XAxis dataKey="name" stroke="#64748b" axisLine={false} tickLine={false} tickMargin={15} />
-                                    <YAxis stroke="#64748b" axisLine={false} tickLine={false} />
-                                    <Tooltip
-                                        contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', borderRadius: '12px' }}
-                                    />
-                                    <Area
-                                        type="monotone"
-                                        dataKey="emissions"
-                                        stroke="url(#colorStroke)"
-                                        strokeWidth={4}
-                                        fillOpacity={1}
-                                        fill="url(#colorTrend)"
-                                        animationDuration={2000}
-                                    />
-                                </AreaChart>
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <AreaChart data={data.monthlyTrend}>
+                                        <defs>
+                                            <linearGradient id="colorTrend" x1="0" y1="0" x2="0" y2="1">
+                                                <stop offset="5%" stopColor="#10b981" stopOpacity={0.2} />
+                                                <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                                            </linearGradient>
+                                            <linearGradient id="colorStroke" x1="0" y1="0" x2="0" y2="1">
+                                                <stop offset="0%" stopColor="#10b981" stopOpacity={1} />
+                                                <stop offset="100%" stopColor="#6366f1" stopOpacity={1} />
+                                            </linearGradient>
+                                        </defs>
+                                        <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
+                                        <XAxis dataKey="name" stroke="#64748b" axisLine={false} tickLine={false} tickMargin={15} />
+                                        <YAxis stroke="#64748b" axisLine={false} tickLine={false} />
+                                        <Tooltip
+                                            contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', borderRadius: '12px' }}
+                                            itemStyle={{ color: '#e2e8f0' }}
+                                        />
+                                        <Area
+                                            type="monotone"
+                                            dataKey="emissions"
+                                            stroke="url(#colorStroke)"
+                                            strokeWidth={4}
+                                            fillOpacity={1}
+                                            fill="url(#colorTrend)"
+                                            animationDuration={2000}
+                                        />
+                                    </AreaChart>
+                                </ResponsiveContainer>
                             ) : (
                                 <div className="flex flex-col items-center justify-center h-full text-slate-600 bg-slate-950/50 rounded-2xl border border-dashed border-slate-800 italic">
                                     <Activity className="w-10 h-10 mb-4 opacity-20" />
                                     Data point synchronization in progress...
                                 </div>
                             )}
-                        </ResponsiveContainer>
+                        </div>
                     </div>
                 </div>
 

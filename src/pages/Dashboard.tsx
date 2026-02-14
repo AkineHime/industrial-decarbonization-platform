@@ -13,6 +13,8 @@ export function Dashboard() {
     const [zones, setZones] = useState<any[]>([]);
     const [forecastData, setForecastData] = useState<any[]>([]);
     const [mode, setMode] = useState<'aggressive' | 'standard'>('aggressive');
+    const [mines, setMines] = useState<any[]>([]);
+    const [selectedMine, setSelectedMine] = useState<string>('all');
 
     // Calculate next phase (Next Quarter)
     const today = new Date();
@@ -27,53 +29,61 @@ export function Dashboard() {
         const fetchData = async () => {
             try {
                 // 1. Fetch Analytics Summary
-                const analyticsRes = await fetch('http://localhost:3000/api/analytics/summary');
+                const analyticsUrl = selectedMine === 'all'
+                    ? 'http://localhost:3000/api/analytics/summary'
+                    : `http://localhost:3000/api/analytics/summary?mine_id=${selectedMine}`;
+
+                const analyticsRes = await fetch(analyticsUrl);
                 const analyticsData = await analyticsRes.json();
                 const totalEmissions = analyticsData.total_co2e || 0;
 
                 // 2. Fetch Mines (for Zones)
                 const minesRes = await fetch('http://localhost:3000/api/mines');
                 const minesData = await minesRes.json();
+                setMines(minesData);
 
                 // Map mines to zones format
-                const mappedZones = minesData.map((mine: any, index: number) => ({
+                // If a specific mine is selected, only show that mine in the zones list
+                const filteredMines = selectedMine === 'all'
+                    ? minesData
+                    : minesData.filter((m: any) => m.id === selectedMine);
+
+                const mappedZones = filteredMines.map((mine: any, index: number) => ({
                     id: mine.name,
                     code: mine.id.substring(0, 8).toUpperCase(),
-                    efficiency: Math.floor(Math.random() * (98 - 85) + 85), // Mock efficiency
+                    efficiency: Math.floor(Math.random() * (98 - 85) + 85),
                     status: index % 3 === 0 ? 'maintenance' : 'active'
                 }));
                 setZones(mappedZones);
+                // 3. Fetch Detailed Analytics for Monthly Trend
+                const detailedUrl = selectedMine === 'all'
+                    ? 'http://localhost:3000/api/analytics/detailed'
+                    : `http://localhost:3000/api/analytics/detailed?mine_id=${selectedMine}`;
 
-                // 3. Fetch Scenarios (for Forecast)
-                const scenariosRes = await fetch('http://localhost:3000/api/scenarios');
-                const scenariosData = await scenariosRes.json();
-
-                // Generate Forecast Data
-                // Use the most aggressive scenario (lowest target year or just first one)
-                const bestScenario = scenariosData[0];
+                const detailedRes = await fetch(detailedUrl);
+                const detailedData = await detailedRes.json();
 
                 // Determine target reduction based on Mode
-                let targetReduction = 0.5; // Default Aggressive
-                if (mode === 'standard') {
-                    targetReduction = 0.2; // Standard 20%
-                } else {
-                    // Start with 50%, but if a scenario exists with higher impact, use that? 
-                    // For now keeping simple toggle logic driven by UI
-                    targetReduction = 0.5;
-                }
+                let targetReduction = mode === 'standard' ? 0.2 : 0.5;
+
+                const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                const monthlyValues = detailedData.monthlyTrend || [];
 
                 const data = [];
-                const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-                let current = totalEmissions / 12; // Monthly average approx
+                let baselineMonthlyAvg = totalEmissions / 12;
 
                 for (let i = 0; i < 12; i++) {
-                    const month = months[(currentMonth + i) % 12];
-                    const reductionFactor = 1 - (targetReduction * (i / 12)); // Linear ramp
+                    const monthIdx = (currentMonth + i) % 12;
+                    const monthName = months[monthIdx];
+
+                    // Find actual data for this month if exists
+                    const actualPoint = monthlyValues.find((p: any) => p.name === monthName);
+                    const reductionFactor = 1 - (targetReduction * (i / 12));
 
                     data.push({
-                        month,
-                        actual: current * (1 + (Math.random() * 0.1 - 0.05)), // Noise
-                        target: current * reductionFactor
+                        month: monthName,
+                        actual: actualPoint ? actualPoint.emissions : (baselineMonthlyAvg > 0 ? baselineMonthlyAvg : 0),
+                        target: baselineMonthlyAvg * reductionFactor
                     });
                 }
                 setForecastData(data);
@@ -90,7 +100,7 @@ export function Dashboard() {
         };
 
         fetchData();
-    }, [mode]); // Re-run when mode changes
+    }, [mode, selectedMine]);
 
     return (
         <div>
@@ -103,7 +113,17 @@ export function Dashboard() {
                     </div>
                     <h1 className="text-3xl font-bold text-slate-100 tracking-tight">Industrial Planning V2.3</h1>
                 </div>
-                <div className="flex space-x-3">
+                <div className="flex space-x-3 items-center">
+                    <select
+                        value={selectedMine}
+                        onChange={(e) => setSelectedMine(e.target.value)}
+                        className="bg-slate-900 border border-slate-700 text-slate-300 text-sm font-bold rounded-xl px-4 py-2 focus:ring-2 focus:ring-emerald-500 outline-none transition-all mr-2"
+                    >
+                        <option value="all">Enterprise View (Full Asset Map)</option>
+                        {mines.map(m => (
+                            <option key={m.id} value={m.id}>{m.name}</option>
+                        ))}
+                    </select>
                     <div className="flex bg-slate-900 rounded-lg p-1 border border-slate-800">
                         <button
                             onClick={() => setMode('aggressive')}
@@ -157,11 +177,15 @@ export function Dashboard() {
 
                 {/* Right Column - Sidebar Widgets (4 cols) */}
                 <div className="col-span-12 lg:col-span-4 space-y-6">
+
+
                     <ZoneOptimization zones={zones} />
+
+
 
                     <div className="bg-gradient-to-br from-emerald-900/20 to-slate-900 border border-emerald-500/20 rounded-2xl p-6 text-center">
                         <button className="w-full py-3 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold rounded-xl transition-all shadow-lg shadow-emerald-900/20 flex items-center justify-center">
-                            Export Full Report
+                            Export Full Analysis
                             <Download className="w-4 h-4 ml-2" />
                         </button>
                     </div>

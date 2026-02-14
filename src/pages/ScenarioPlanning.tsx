@@ -5,11 +5,11 @@ import { cn } from '../lib/utils';
 import { useForm } from 'react-hook-form';
 
 const INTERVENTIONS = [
-    { id: 'solar_pv', name: '50MW Solar PV Farm', type: 'renewables', impact: 0.35, cost: '$$$' },
-    { id: 'ev_fleet', name: 'Electric Dumpers & Excavators', type: 'transport', impact: 0.25, cost: '$$$$' },
-    { id: 'methane_capture', name: 'VAM Capture System', type: 'process', impact: 0.15, cost: '$$' },
-    { id: 'process_efficiency', name: 'Process Efficiency Upgrades', type: 'process', impact: 0.05, cost: '$' },
-    { id: 'afforestation', name: 'Afforestation Phase 1', type: 'sinks', impact: 0.02, cost: '$' },
+    { id: 'solar_pv', name: '50MW Solar PV Farm', type: 'renewables', impact: 0.35, cost: '$$$', capex: 12000000, annual_savings: 2100000 },
+    { id: 'ev_fleet', name: 'Electric Dumpers & Excavators', type: 'transport', impact: 0.25, cost: '$$$$', capex: 8500000, annual_savings: 1400000 },
+    { id: 'methane_capture', name: 'VAM Capture System', type: 'process', impact: 0.15, cost: '$$', capex: 3000000, annual_savings: 800000 },
+    { id: 'process_efficiency', name: 'Process Efficiency Upgrades', type: 'process', impact: 0.05, cost: '$', capex: 500000, annual_savings: 200000 },
+    { id: 'afforestation', name: 'Afforestation Phase 1', type: 'sinks', impact: 0.02, cost: '$', capex: 100000, annual_savings: 5000 },
 ];
 
 export function ScenarioPlanning() {
@@ -18,8 +18,9 @@ export function ScenarioPlanning() {
     const [activeInterventions, setActiveInterventions] = useState<string[]>([]);
     const [baseEmissions, setBaseEmissions] = useState(0);
     const [mines, setMines] = useState<any[]>([]);
+    const [filterMine, setFilterMine] = useState<string>('all');
 
-    const { register, handleSubmit, reset } = useForm({
+    const { register, handleSubmit, reset, watch } = useForm({
         defaultValues: {
             name: '',
             description: '',
@@ -30,8 +31,6 @@ export function ScenarioPlanning() {
     const [isCreating, setIsCreating] = useState(false);
 
     // Custom Interventions State
-    const [customIntervention, setCustomIntervention] = useState('');
-    const [customCost, setCustomCost] = useState('$$');
     const [localInterventions, setLocalInterventions] = useState(INTERVENTIONS);
 
     // Calculate total reduction factor from active interventions
@@ -50,27 +49,49 @@ export function ScenarioPlanning() {
             .then(res => res.json())
             .then(data => setMines(data))
             .catch(err => console.error(err));
-
-        // Fetch base emissions (current total)
-        fetch('http://localhost:3000/api/analytics/summary')
-            .then(res => res.json())
-            .then(data => setBaseEmissions(data.total_co2e || 10000)) // Fallback to 10k for visual if 0
-            .catch(err => console.error(err));
     }, []);
 
-    const handleAddCustomIntervention = () => {
-        if (!customIntervention) return;
+    // Watch for mine selection to update baseline
+    const watchedMineId = watch('mine_id');
+
+    useEffect(() => {
+        // Priority: 1. Selected Scenario's Mine, 2. Form's selected Mine, 3. Global Filter's Mine
+        const activeMine = selectedScenario?.mine_id || watchedMineId || (filterMine !== 'all' ? filterMine : null);
+
+        const url = activeMine
+            ? `http://localhost:3000/api/analytics/summary?mine_id=${activeMine}`
+            : 'http://localhost:3000/api/analytics/summary';
+
+        fetch(url)
+            .then(res => res.json())
+            .then(data => setBaseEmissions(data.total_co2e || 0))
+            .catch(err => console.error(err));
+    }, [selectedScenario, watchedMineId, filterMine]);
+
+    // Custom Intervention Modal State
+    const [isAddingCustom, setIsAddingCustom] = useState(false);
+    const [newCustomName, setNewCustomName] = useState('');
+    const [newCustomCost, setNewCustomCost] = useState(0);
+    const [newCustomImpact, setNewCustomImpact] = useState(0.05);
+
+    const handleSaveCustomIntervention = () => {
+        if (!newCustomName) return;
         const newId = `custom_${Date.now()}`;
         const newIntervention = {
             id: newId,
-            name: customIntervention,
+            name: newCustomName,
             type: 'custom',
-            impact: 0.05, // Default small impact
-            cost: customCost
+            impact: newCustomImpact,
+            cost: newCustomCost >= 1000000 ? '$$$' : (newCustomCost >= 500000 ? '$$' : '$'),
+            capex: newCustomCost,
+            annual_savings: newCustomCost * 0.2 // Assume 20% ROI default
         };
         setLocalInterventions([...localInterventions, newIntervention]);
-        setCustomIntervention('');
-        setCustomCost('$$'); // Reset to default
+        setActiveInterventions(prev => [...prev, newId]); // Auto-select it
+        setIsAddingCustom(false);
+        setNewCustomName('');
+        setNewCustomCost(0);
+        setNewCustomImpact(0.05);
     };
 
     const handleDeleteScenario = async (id: string, e: React.MouseEvent) => {
@@ -198,6 +219,28 @@ export function ScenarioPlanning() {
         return value.toString();
     };
 
+    const filteredScenarios = filterMine === 'all'
+        ? scenarios
+        : scenarios.filter(s => s.mine_id === filterMine);
+
+    // Cost Edit Modal Logic
+    const [editingIntervention, setEditingIntervention] = useState<any | null>(null);
+    const [editCost, setEditCost] = useState(0);
+
+    const openEditModal = (intervention: any, e: React.MouseEvent) => {
+        e.stopPropagation();
+        setEditingIntervention(intervention);
+        setEditCost(intervention.capex);
+    };
+
+    const saveEditCost = () => {
+        if (!editingIntervention) return;
+        setLocalInterventions(prev => prev.map(i =>
+            i.id === editingIntervention.id ? { ...i, capex: editCost, cost: editCost >= 1000000 ? '$$$' : '$$' } : i
+        ));
+        setEditingIntervention(null);
+    };
+
     return (
         <div className="h-[calc(100vh-2rem)] flex flex-col">
             <div className="flex justify-between items-center mb-6">
@@ -206,6 +249,16 @@ export function ScenarioPlanning() {
                     <p className="text-slate-500">Model decarbonization pathways and interventions</p>
                 </div>
                 <div className="flex gap-3">
+                    <select
+                        value={filterMine}
+                        onChange={(e) => setFilterMine(e.target.value)}
+                        className="bg-slate-900 border border-slate-700 text-slate-300 text-sm font-bold rounded-xl px-4 py-2 focus:ring-2 focus:ring-emerald-500 outline-none transition-all mr-2"
+                    >
+                        <option value="all">View All Units</option>
+                        {mines.map(m => (
+                            <option key={m.id} value={m.id}>{m.name}</option>
+                        ))}
+                    </select>
                     {selectedScenario && (
                         <button
                             onClick={handleUpdateScenario}
@@ -234,7 +287,7 @@ export function ScenarioPlanning() {
                         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex-1">
                             <h3 className="text-slate-400 font-bold text-xs uppercase tracking-wider mb-4">Saved Scenarios</h3>
                             <div className="space-y-3">
-                                {scenarios.map(s => (
+                                {filteredScenarios.map(s => (
                                     <div
                                         key={s.id}
                                         onClick={() => {
@@ -347,29 +400,14 @@ export function ScenarioPlanning() {
                         <h3 className="text-slate-400 font-bold text-xs uppercase tracking-wider mb-4">Interventions</h3>
 
                         {/* Add New Intervention Input */}
-                        <div className="flex mb-4 gap-2">
-                            <input
-                                value={customIntervention}
-                                onChange={(e) => setCustomIntervention(e.target.value)}
-                                placeholder="Add e.g., 'Tree Planting'"
-                                className="bg-slate-950 border border-slate-800 rounded px-3 py-2 text-sm text-slate-200 flex-1 focus:border-emerald-500 outline-none"
-                            />
-                            <select
-                                value={customCost}
-                                onChange={(e) => setCustomCost(e.target.value)}
-                                className="bg-slate-950 border border-slate-800 rounded px-2 py-2 text-sm text-slate-200 outline-none focus:border-emerald-500"
-                            >
-                                <option value="$">$ Low</option>
-                                <option value="$$">$$ Med</option>
-                                <option value="$$$">$$$ High</option>
-                            </select>
-                            <button
-                                onClick={handleAddCustomIntervention}
-                                className="bg-slate-800 hover:bg-emerald-600 text-slate-300 hover:text-white px-3 rounded font-bold transition-colors"
-                            >
-                                +
-                            </button>
-                        </div>
+                        {/* Add New Intervention Button */}
+                        <button
+                            onClick={() => setIsAddingCustom(true)}
+                            className="w-full py-3 mb-4 border border-dashed border-slate-700 hover:border-emerald-500/50 hover:bg-slate-800/50 text-slate-400 hover:text-emerald-400 rounded-xl flex items-center justify-center transition-all group"
+                        >
+                            <Plus className="w-4 h-4 mr-2 group-hover:scale-110 transition-transform" />
+                            <span className="text-sm font-bold">Add Custom Intervention</span>
+                        </button>
 
                         <div className="space-y-2 max-h-[300px] overflow-y-auto custom-scrollbar">
                             {currentInterventions.map((item) => (
@@ -377,7 +415,7 @@ export function ScenarioPlanning() {
                                     key={item.id}
                                     onClick={() => toggleIntervention(item.id)}
                                     className={cn(
-                                        "flex items-center p-3 rounded-lg cursor-pointer border transition-all",
+                                        "flex items-center p-3 rounded-lg cursor-pointer border transition-all relative group",
                                         activeInterventions.includes(item.id)
                                             ? "bg-emerald-900/20 border-emerald-500/30"
                                             : "bg-slate-950/50 border-slate-800 hover:border-slate-700"
@@ -393,7 +431,12 @@ export function ScenarioPlanning() {
                                         <div className="text-sm font-medium text-slate-200">{item.name}</div>
                                         <div className="text-xs text-slate-500 flex justify-between mt-1">
                                             <span>Est. Impact: -{Math.round(item.impact * 100)}%</span>
-                                            <span>{item.cost}</span>
+                                            <span
+                                                className="hover:text-amber-400 cursor-pointer underline decoration-dotted"
+                                                onClick={(e) => openEditModal(item, e)}
+                                            >
+                                                ${(item.capex / 1000000).toFixed(1)}M
+                                            </span>
                                         </div>
                                     </div>
                                 </div>
@@ -401,6 +444,111 @@ export function ScenarioPlanning() {
                         </div>
                     </div>
                 </div>
+
+                {/* Custom Intervention Modal */}
+                {isAddingCustom && (
+                    <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 backdrop-blur-sm animate-in fade-in duration-200">
+                        <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl w-[400px] shadow-2xl shadow-emerald-900/20">
+                            <h3 className="text-lg font-bold text-slate-100 mb-1">New Intervention</h3>
+                            <p className="text-slate-500 text-xs mb-6">Define a custom initiative for your roadmap.</p>
+
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="text-xs text-slate-500 font-bold uppercase tracking-wider">Name</label>
+                                    <input
+                                        type="text"
+                                        value={newCustomName}
+                                        onChange={(e) => setNewCustomName(e.target.value)}
+                                        placeholder="e.g. Supplier Engagement Program"
+                                        className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-slate-200 mt-1 focus:border-emerald-500 outline-none"
+                                        autoFocus
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="text-xs text-slate-500 font-bold uppercase tracking-wider">Estimated Cost (CAPEX)</label>
+                                    <div className="relative mt-1">
+                                        <span className="absolute left-3 top-2.5 text-slate-500">$</span>
+                                        <input
+                                            type="number"
+                                            value={newCustomCost}
+                                            onChange={(e) => setNewCustomCost(parseFloat(e.target.value))}
+                                            className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 pl-7 text-white focus:border-emerald-500 outline-none"
+                                        />
+                                    </div>
+                                    <div className="flex gap-2 mt-2 flex-wrap">
+                                        {[10000, 50000, 100000, 500000, 1000000].map(amt => (
+                                            <button
+                                                key={amt}
+                                                onClick={() => setNewCustomCost(amt)}
+                                                className="px-2 py-1 bg-slate-800 hover:bg-emerald-500/20 hover:text-emerald-400 border border-transparent hover:border-emerald-500/50 rounded text-[10px] text-slate-400 transition-all font-bold"
+                                            >
+                                                ${(amt >= 1000000 ? (amt / 1000000) + 'M' : (amt / 1000) + 'k')}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label className="text-xs text-slate-500 font-bold uppercase tracking-wider">Reduction Impact</label>
+                                    <div className="flex items-center mt-1 space-x-3">
+                                        <input
+                                            type="range"
+                                            min="0" max="0.5" step="0.01"
+                                            value={newCustomImpact}
+                                            onChange={(e) => setNewCustomImpact(parseFloat(e.target.value))}
+                                            className="flex-1 accent-emerald-500 h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer"
+                                        />
+                                        <span className="text-emerald-400 font-bold w-12 text-right">{(newCustomImpact * 100).toFixed(0)}%</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="flex justify-end gap-3 mt-8">
+                                <button onClick={() => setIsAddingCustom(false)} className="text-slate-400 hover:text-white text-sm font-bold px-3 py-2">Cancel</button>
+                                <button
+                                    onClick={handleSaveCustomIntervention}
+                                    disabled={!newCustomName}
+                                    className="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed text-white px-4 py-2 rounded-lg font-bold shadow-lg shadow-emerald-900/20"
+                                >
+                                    Add Intervention
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+                {editingIntervention && (
+                    <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
+                        <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl w-[400px]">
+                            <h3 className="text-lg font-bold text-slate-100 mb-4">Edit Capital Expenditure</h3>
+                            <p className="text-slate-400 text-sm mb-4">Override estimate for {editingIntervention.name}</p>
+
+                            <input
+                                type="number"
+                                value={editCost}
+                                onChange={(e) => setEditCost(parseFloat(e.target.value))}
+                                className="w-full bg-slate-950 border border-slate-700 rounded-lg p-3 text-white mb-4"
+                            />
+
+                            <div className="flex gap-2 mb-6">
+                                {[100000, 500000, 1000000, 5000000].map(amt => (
+                                    <button
+                                        key={amt}
+                                        onClick={() => setEditCost(amt)}
+                                        className="px-3 py-1 bg-slate-800 hover:bg-slate-700 rounded text-xs text-slate-300"
+                                    >
+                                        ${(amt / 1000000).toFixed(1)}M
+                                    </button>
+                                ))}
+                            </div>
+
+                            <div className="flex justify-end gap-3">
+                                <button onClick={() => setEditingIntervention(null)} className="text-slate-400 hover:text-white text-sm">Cancel</button>
+                                <button onClick={saveEditCost} className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg font-bold">Save Changes</button>
+                            </div>
+                        </div>
+                    </div>
+                )}
 
                 {/* Right Content - Visualization */}
                 <div className="col-span-12 lg:col-span-8 flex flex-col space-y-6">
@@ -415,26 +563,34 @@ export function ScenarioPlanning() {
                         </div>
 
                         <div className="h-[350px] w-full">
-                            <ResponsiveContainer width="100%" height="100%">
-                                <AreaChart data={chartData}>
-                                    <defs>
-                                        <linearGradient id="colorScenario" x1="0" y1="0" x2="0" y2="1">
-                                            <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
-                                            <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
-                                        </linearGradient>
-                                    </defs>
-                                    <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
-                                    <XAxis dataKey="year" stroke="#64748b" tickLine={false} axisLine={false} />
-                                    <YAxis stroke="#64748b" tickLine={false} axisLine={false} tickFormatter={formatValue} />
-                                    <Tooltip
-                                        contentStyle={{ backgroundColor: '#0f172a', borderColor: '#1e293b', color: '#f8fafc' }}
-                                        itemStyle={{ color: '#f8fafc' }}
-                                        formatter={(value: any) => [formatValue(value), '']}
-                                    />
-                                    <Area type="monotone" dataKey="baseline" stroke="#475569" strokeWidth={2} fill="transparent" name="Baseline" dot={false} />
-                                    <Area type="monotone" dataKey="scenario" stroke="#10b981" strokeWidth={3} fill="url(#colorScenario)" name="Scenario" />
-                                </AreaChart>
-                            </ResponsiveContainer>
+                            {baseEmissions > 0 ? (
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <AreaChart data={chartData}>
+                                        <defs>
+                                            <linearGradient id="colorScenario" x1="0" y1="0" x2="0" y2="1">
+                                                <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
+                                                <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                                            </linearGradient>
+                                        </defs>
+                                        <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
+                                        <XAxis dataKey="year" stroke="#64748b" tickLine={false} axisLine={false} />
+                                        <YAxis stroke="#64748b" tickLine={false} axisLine={false} tickFormatter={formatValue} />
+                                        <Tooltip
+                                            contentStyle={{ backgroundColor: '#0f172a', borderColor: '#1e293b', color: '#f8fafc' }}
+                                            itemStyle={{ color: '#f8fafc' }}
+                                            formatter={(value: any) => [formatValue(value), '']}
+                                        />
+                                        <Area type="monotone" dataKey="baseline" stroke="#475569" strokeWidth={2} fill="transparent" name="Baseline" dot={false} />
+                                        <Area type="monotone" dataKey="scenario" stroke="#10b981" strokeWidth={3} fill="url(#colorScenario)" name="Scenario" />
+                                    </AreaChart>
+                                </ResponsiveContainer>
+                            ) : (
+                                <div className="flex flex-col items-center justify-center h-full text-slate-500 bg-slate-950/50 rounded-2xl border border-dashed border-slate-800 italic">
+                                    <Activity className="w-10 h-10 mb-4 opacity-20" />
+                                    No baseline emissions found for this selection.
+                                    <span className="text-xs mt-2 not-italic text-slate-600">Add operational data to start modeling.</span>
+                                </div>
+                            )}
                         </div>
                     </div>
 
@@ -451,47 +607,44 @@ export function ScenarioPlanning() {
                             <div className="text-slate-600 text-xs mt-1">vs Baseline</div>
                         </div>
                         <div className="bg-slate-900 border border-slate-800 p-4 rounded-xl">
-                            <div className="text-slate-500 text-xs font-bold uppercase tracking-wider mb-1">CAPEX Intensity</div>
+                            <div className="text-slate-500 text-xs font-bold uppercase tracking-wider mb-1">Total Investment</div>
                             {(() => {
-                                const costScore = activeInterventions.reduce((acc, id) => {
+                                const totalCapex = activeInterventions.reduce((acc, id) => {
                                     const i = currentInterventions.find(item => item.id === id);
-                                    if (!i) return acc;
-                                    return acc + (i.cost.length || 0); // '$' = 1, '$$' = 2
+                                    return acc + (i?.capex || 0);
                                 }, 0);
-
-                                let label = 'Low';
-                                let color = 'text-emerald-400';
-                                if (costScore > 6) { label = 'High'; color = 'text-red-400'; }
-                                else if (costScore > 3) { label = 'Medium'; color = 'text-amber-400'; }
 
                                 return (
                                     <>
-                                        <div className={`text-2xl font-bold ${color}`}>{label}</div>
-                                        <div className="text-slate-600 text-xs mt-1">Score: {costScore}</div>
+                                        <div className="text-2xl font-bold text-amber-400">
+                                            {totalCapex >= 1000000 ? `$${(totalCapex / 1000000).toFixed(1)}M` : `$${(totalCapex / 1000).toFixed(0)}k`}
+                                        </div>
+                                        <div className="text-slate-600 text-xs mt-1">CAPEX Budget</div>
                                     </>
                                 );
                             })()}
                         </div>
                         <div className="bg-slate-900 border border-slate-800 p-4 rounded-xl">
-                            <div className="text-slate-500 text-xs font-bold uppercase tracking-wider mb-1">Net Zero Year</div>
+                            <div className="text-slate-500 text-xs font-bold uppercase tracking-wider mb-1">Annual ROI</div>
                             {(() => {
-                                const impact = activeInterventions.reduce((acc, id) => {
+                                const totalSavings = activeInterventions.reduce((acc, id) => {
                                     const i = currentInterventions.find(item => item.id === id);
-                                    return acc + (i?.impact || 0);
+                                    return acc + (i?.annual_savings || 0);
                                 }, 0);
 
-                                const currentYear = new Date().getFullYear();
-                                // Simple projection: 100% reduction = 2030, 0% = >2050
-                                const projectedYear = impact > 0
-                                    ? Math.round(currentYear + (1 - impact) * 25 + 5)
-                                    : '2050+';
+                                const totalCapex = activeInterventions.reduce((acc, id) => {
+                                    const i = currentInterventions.find(item => item.id === id);
+                                    return acc + (i?.capex || 0);
+                                }, 0);
 
-                                const yearDisplay = impact >= 1 ? currentYear + 1 : (impact <= 0 ? '> 2060' : projectedYear);
+                                const payback = totalSavings > 0 ? (totalCapex / totalSavings).toFixed(1) : 0;
 
                                 return (
                                     <>
-                                        <div className="text-2xl font-bold text-blue-400">{yearDisplay}</div>
-                                        <div className="text-slate-600 text-xs mt-1">Estimated</div>
+                                        <div className="text-2xl font-bold text-blue-400">
+                                            {payback} <span className="text-sm font-normal">Years</span>
+                                        </div>
+                                        <div className="text-slate-600 text-xs mt-1">Est. Payback Period</div>
                                     </>
                                 );
                             })()}

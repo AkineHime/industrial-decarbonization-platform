@@ -1,17 +1,16 @@
 import React, { useCallback, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
 import * as XLSX from 'xlsx';
-import { Upload, FileSpreadsheet, X, Check, AlertCircle } from 'lucide-react';
+import { Upload, FileSpreadsheet, X, AlertCircle } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
 interface FileUploadProps {
-    onDataLoaded: (data: any[]) => void;
+    onDataLoaded: (data: Record<string, any[]>) => void;
 }
 
 export function FileUpload({ onDataLoaded }: FileUploadProps) {
     const [file, setFile] = useState<File | null>(null);
     const [error, setError] = useState<string | null>(null);
-    const [dragActive, setDragActive] = useState(false);
 
     const onDrop = useCallback((acceptedFiles: File[]) => {
         const uploadedFile = acceptedFiles[0];
@@ -38,14 +37,21 @@ export function FileUpload({ onDataLoaded }: FileUploadProps) {
             try {
                 const data = e.target?.result;
                 const workbook = XLSX.read(data, { type: 'binary' });
-                const sheetName = workbook.SheetNames[0];
-                const sheet = workbook.Sheets[sheetName];
-                const jsonData = XLSX.utils.sheet_to_json(sheet);
-                console.log("Parsed Data:", jsonData);
-                onDataLoaded(jsonData);
+
+                const allSheets: Record<string, any[]> = {};
+                workbook.SheetNames.forEach(sheetName => {
+                    const sheet = workbook.Sheets[sheetName];
+                    const jsonData = XLSX.utils.sheet_to_json(sheet);
+                    if (jsonData.length > 0) {
+                        allSheets[sheetName] = jsonData;
+                    }
+                });
+
+                console.log("Parsed Data:", allSheets);
+                onDataLoaded(allSheets);
             } catch (err) {
                 console.error("Error parsing file:", err);
-                setError("Failed to parse file. Please ensure it fits the template.");
+                setError("Failed to parse file. Please ensure it follows the template format.");
             }
         };
         reader.readAsBinaryString(file);
@@ -55,7 +61,7 @@ export function FileUpload({ onDataLoaded }: FileUploadProps) {
         e.stopPropagation();
         setFile(null);
         setError(null);
-        onDataLoaded([]);
+        onDataLoaded({});
     };
 
     return (
